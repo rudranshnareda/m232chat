@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Search, X } from 'lucide-react'
-import { PageHeader }      from '@/components/layout/page-header'
-import { UserAvatar }      from '@/components/ui/user-avatar'
+import { PageHeader }       from '@/components/layout/page-header'
+import { UserAvatar }       from '@/components/ui/user-avatar'
 import { UserListSkeleton } from '@/components/ui/skeleton'
-import { useDebounce }     from '@/hooks/use-debounce'
+import { useDebounce }      from '@/hooks/use-debounce'
 import type { ConnectionStatus, UserProfile } from '@/types'
 
 interface SearchUser extends UserProfile {
@@ -33,11 +33,13 @@ export default function SearchPage() {
   const debouncedQuery = useDebounce(query, 300)
 
   const { data: users = [], isFetching, isError } = useQuery({
-    queryKey: ['user-search', debouncedQuery],
-    queryFn:  () => searchUsers(debouncedQuery),
-    enabled:  debouncedQuery.length > 0,
+    queryKey:  ['user-search', debouncedQuery],
+    queryFn:   () => searchUsers(debouncedQuery),
     staleTime: 30_000,
+    // always enabled — empty query returns all users from the API
   })
+
+  const isEmpty = !isFetching && !isError && users.length === 0
 
   return (
     <>
@@ -66,16 +68,8 @@ export default function SearchPage() {
       </div>
 
       <main className="flex flex-1 flex-col overflow-y-auto">
-        {/* Empty / idle state */}
-        {debouncedQuery.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
-            <Search className="h-8 w-8 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">Type a username to search</p>
-          </div>
-        )}
-
-        {/* Loading */}
-        {isFetching && debouncedQuery.length > 0 && <UserListSkeleton count={4} />}
+        {/* Loading skeleton */}
+        {isFetching && <UserListSkeleton count={4} />}
 
         {/* Error */}
         {isError && (
@@ -84,39 +78,40 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Results */}
-        {!isFetching && !isError && debouncedQuery.length > 0 && (
-          <>
-            {users.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
-                <p className="text-sm text-muted-foreground">No users found for &ldquo;{debouncedQuery}&rdquo;</p>
-              </div>
-            ) : (
-              <ul>
-                {users.map(user => (
-                  <li key={user.id}>
-                    <Link
-                      href={`/users/${user.id}`}
-                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 active:bg-muted"
-                    >
-                      <UserAvatar username={user.username} profilePhoto={user.profilePhoto} size="md" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">@{user.username}</p>
-                        {user.bio && (
-                          <p className="truncate text-xs text-muted-foreground">{user.bio}</p>
-                        )}
-                      </div>
-                      {user.connectionStatus !== 'none' && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {STATUS_LABEL[user.connectionStatus]}
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+        {/* No results */}
+        {isEmpty && debouncedQuery.length > 0 && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No users found for &ldquo;{debouncedQuery}&rdquo;
+            </p>
+          </div>
+        )}
+
+        {/* User list */}
+        {!isFetching && !isError && users.length > 0 && (
+          <ul>
+            {users.map(user => (
+              <li key={user.id}>
+                <Link
+                  href={`/users/${user.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 active:bg-muted"
+                >
+                  <UserAvatar username={user.username} profilePhoto={user.profilePhoto} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">@{user.username}</p>
+                    {user.bio && (
+                      <p className="truncate text-xs text-muted-foreground">{user.bio}</p>
+                    )}
+                  </div>
+                  {user.connectionStatus !== 'none' && (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {STATUS_LABEL[user.connectionStatus]}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </main>
     </>

@@ -8,18 +8,20 @@ export async function GET(request: NextRequest) {
   if (!meId) return Response.json({ error: 'Unauthorized.' }, { status: 401 })
 
   const q = request.nextUrl.searchParams.get('q')?.trim() ?? ''
-  if (q.length < 1) return Response.json({ users: [] })
 
   const admin = createSupabaseAdminClient()
 
-  // Search users by username prefix (case-insensitive), exclude self
-  const { data: rows, error } = await admin
+  // If no query, return all users (excluding self); otherwise filter by username
+  const baseQuery = admin
     .from('users')
     .select('id, username, profile_photo, bio, last_seen_at')
-    .ilike('username', `%${q}%`)
     .neq('id', meId)
     .order('username', { ascending: true })
-    .limit(20) as {
+    .limit(50)
+
+  const { data: rows, error } = (q.length > 0
+    ? await baseQuery.ilike('username', `%${q}%`)
+    : await baseQuery) as {
       data: Pick<DbUser, 'id' | 'username' | 'profile_photo' | 'bio' | 'last_seen_at'>[] | null
       error: unknown
     }
