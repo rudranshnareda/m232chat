@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const fileExt = file.name.split('.').pop() || 'bin'
   const timestamp = Date.now()
   const filename = `${conversationId}/${meId}/${timestamp}_${Math.random().toString(36).slice(2)}.${fileExt}`
-  const bucketName = 'messages-media'
+  const bucketName = 'chat-media'
 
   const buffer = await file.arrayBuffer()
   const { error: uploadError } = await admin.storage
