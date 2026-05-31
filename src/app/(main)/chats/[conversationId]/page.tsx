@@ -218,7 +218,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         <div className="flex shrink-0 items-center justify-center gap-1.5 bg-amber-500/10 px-4 py-1.5">
           <BookDashed className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           <p className="text-[11px] text-amber-700 dark:text-amber-400">
-            History off — messages disappear on next login
+            History off — messages disappear when you reload
           </p>
         </div>
       )}
@@ -377,7 +377,7 @@ export default function ChatPage({ params }: ChatPageProps) {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {meta?.saveHistory
                     ? 'Messages are kept between sessions.'
-                    : 'Messages vanish on your next login. Only affects your view.'}
+                    : 'Messages vanish when you reload the app. Only affects your view.'}
                 </p>
               </div>
             </button>
