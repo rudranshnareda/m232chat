@@ -117,7 +117,7 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   const {
     messages, isLoading, loadError, isSending, isSendingMedia,
-    hasMore, loadOlder, sendMessage, sendMedia, retryFailed, deleteMessage,
+    hasMore, loadOlder, sendMessage, sendMedia, retryFailed, deleteMessage, toggleReaction,
   } = useChatMessages(conversationId, saveHistory)
 
   // ── O(1) message lookup for reply-to resolution ───────────────────────────
@@ -373,6 +373,7 @@ export default function ChatPage({ params }: ChatPageProps) {
                     onLongPress={() => {
                       if (!msg.isOptimistic) setActionMsg(msg)
                     }}
+                    onReact={(emoji) => toggleReaction(msg.id, emoji)}
                     onRetry={msg.deliveryStatus === 'failed' && msg.content
                       ? () => retryFailed(msg.id, msg.content!)
                       : undefined}
@@ -416,6 +417,7 @@ export default function ChatPage({ params }: ChatPageProps) {
           message={actionMsg}
           isMe={actionMsg.senderId === me?.id}
           onReply={() => { handleReply(actionMsg); closeSheet() }}
+          onReact={(emoji) => { toggleReaction(actionMsg.id, emoji); closeSheet() }}
           onInfo={() => { setInfoMsg(actionMsg); setActionMsg(null) }}
           onDeleteForMe={() => { deleteMessage(actionMsg.id, 'me'); closeSheet() }}
           onDeleteForBoth={actionMsg.senderId === me?.id

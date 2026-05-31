@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuthStore, useUser } from '@/store/auth'
-import type { Message, MessageDeliveryStatus } from '@/types'
-import type { DbMessage, DbMessageStatus } from '@/types/database'
+import type { Message, MessageDeliveryStatus, MessageReaction } from '@/types'
+import type { DbMessage, DbMessageReaction, DbMessageStatus } from '@/types/database'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,8 @@ export interface UseChatMessagesResult {
   sendMessage:    (content: string, replyToMessageId?: string | null) => Promise<void>
   sendMedia:      (file: File, replyToMessageId?: string | null) => Promise<void>
   retryFailed:    (tempId: string, content: string) => Promise<void>
-  deleteMessage:  (messageId: string, target: 'me' | 'both') => Promise<void>
+  deleteMessage:   (messageId: string, target: 'me' | 'both') => Promise<void>
+  toggleReaction:  (messageId: string, emoji: string) => Promise<void>
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -188,6 +189,62 @@ export function useChatMessages(
     return () => { supabase.removeChannel(channel) }
   }, [supabase, conversationId])
 
+  // ── Realtime: reaction inserts/deletes ────────────────────────────────────
+  // Table needs REPLICA IDENTITY FULL so DELETE payloads include full row data.
+  // Filter by conversation_id so each chat only receives its own reactions.
+  useEffect(() => {
+    if (!supabase || !me?.id) return
+    const meId = me.id
+    const channel = supabase
+      .channel(`reactions:${conversationId}`)
+      .on('postgres_changes',
+        {
+          event:  'INSERT',
+          schema: 'public',
+          table:  'message_reactions',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          if (!loadedRef.current) return
+          const r = payload.new as DbMessageReaction
+          // Skip own reactions — already applied optimistically
+          if (r.user_id === meId) return
+          setMessages(prev => prev.map(m => {
+            if (m.id !== r.message_id) return m
+            const reactions = m.reactions ?? []
+            const hit = reactions.find(x => x.emoji === r.emoji)
+            if (hit) return { ...m, reactions: reactions.map(x => x.emoji === r.emoji ? { ...x, count: x.count + 1 } : x) }
+            return { ...m, reactions: [...reactions, { emoji: r.emoji, count: 1, byMe: false }] }
+          }))
+        }
+      )
+      .on('postgres_changes',
+        {
+          event:  'DELETE',
+          schema: 'public',
+          table:  'message_reactions',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          if (!loadedRef.current) return
+          const r = payload.old as Partial<DbMessageReaction>
+          if (!r.message_id || !r.emoji) return
+          // Skip own removals — already applied optimistically
+          if (r.user_id === meId) return
+          setMessages(prev => prev.map(m => {
+            if (m.id !== r.message_id) return m
+            const reactions = m.reactions ?? []
+            const hit = reactions.find(x => x.emoji === r.emoji)
+            if (!hit) return m
+            if (hit.count <= 1) return { ...m, reactions: reactions.filter(x => x.emoji !== r.emoji) }
+            return { ...m, reactions: reactions.map(x => x.emoji === r.emoji ? { ...x, count: x.count - 1 } : x) }
+          }))
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [supabase, conversationId, me?.id])
+
   // ── Send ──────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (
     content: string,
@@ -308,6 +365,37 @@ export function useChatMessages(
     }
   }, [me, conversationId])
 
+  // ── Toggle reaction ───────────────────────────────────────────────────────
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!me) return
+
+    // Optimistic update
+    setMessages(prev => prev.map(m => {
+      if (m.id !== messageId) return m
+      const reactions = m.reactions ?? []
+      const hit = reactions.find(r => r.emoji === emoji)
+      let next: MessageReaction[]
+      if (hit?.byMe) {
+        // Remove our reaction
+        next = hit.count <= 1
+          ? reactions.filter(r => r.emoji !== emoji)
+          : reactions.map(r => r.emoji === emoji ? { ...r, count: r.count - 1, byMe: false } : r)
+      } else if (hit) {
+        // Someone else has it — add ours too
+        next = reactions.map(r => r.emoji === emoji ? { ...r, count: r.count + 1, byMe: true } : r)
+      } else {
+        // Brand new emoji
+        next = [...reactions, { emoji, count: 1, byMe: true }]
+      }
+      return { ...m, reactions: next }
+    }))
+
+    await fetch(
+      `/api/conversations/${conversationId}/messages/${messageId}/react`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji }) }
+    ).catch(() => {})
+  }, [me, conversationId])
+
   // ── Retry ─────────────────────────────────────────────────────────────────
   const retryFailed = useCallback(async (tempId: string, content: string) => {
     setMessages(prev => prev.filter(m => m.id !== tempId))
@@ -344,6 +432,6 @@ export function useChatMessages(
 
   return {
     messages, isLoading, loadError, isSending, isSendingMedia, hasMore,
-    loadOlder, sendMessage, sendMedia, retryFailed, deleteMessage,
+    loadOlder, sendMessage, sendMedia, retryFailed, deleteMessage, toggleReaction,
   }
 }

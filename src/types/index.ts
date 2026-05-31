@@ -48,6 +48,12 @@ export type MessageType = 'text' | 'image' | 'video' | 'file' | 'voice_note' | '
 
 export type MessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 
+export interface MessageReaction {
+  emoji: string
+  count: number
+  byMe:  boolean
+}
+
 export interface MessageMedia {
   id: string
   storagePath: string
@@ -74,6 +80,7 @@ export interface Message {
   media?: MessageMedia | null
   deliveredAt: string | null
   readAt: string | null
+  reactions?: MessageReaction[]
   // client-only
   deliveryStatus?: MessageDeliveryStatus
   isOptimistic?: boolean

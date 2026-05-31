@@ -2,7 +2,7 @@ import { Check, CheckCheck, Clock, AlertCircle, Play, Pause } from 'lucide-react
 import { useRef, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useLongPress } from '@/hooks/use-long-press'
-import type { Message, MessageDeliveryStatus } from '@/types'
+import type { Message, MessageDeliveryStatus, MessageReaction } from '@/types'
 
 interface MessageBubbleProps {
   message:        Message
@@ -13,6 +13,7 @@ interface MessageBubbleProps {
   /** Resolved reply-to message (looked up from local messages map by caller) */
   replyTo?:       Pick<Message, 'id' | 'senderId' | 'content' | 'messageType'> | null
   onLongPress:    () => void
+  onReact:        (emoji: string) => void
   onRetry?:       () => void
 }
 
@@ -177,9 +178,37 @@ function VoiceNotePlayer({ src, isMe }: { src: string; isMe: boolean }) {
   )
 }
 
+// ── Reaction bar ─────────────────────────────────────────────────────────────
+function ReactionBar({ reactions, isMe, onToggle }: {
+  reactions: MessageReaction[]
+  isMe:      boolean
+  onToggle:  (emoji: string) => void
+}) {
+  if (!reactions.length) return null
+  return (
+    <div className={cn('mt-1 flex flex-wrap gap-1', isMe ? 'justify-end' : 'justify-start')}>
+      {reactions.map(r => (
+        <button
+          key={r.emoji}
+          onClick={e => { e.stopPropagation(); onToggle(r.emoji) }}
+          className={cn(
+            'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors',
+            r.byMe
+              ? 'border-primary/50 bg-primary/15 text-primary'
+              : 'border-border bg-muted text-foreground hover:bg-muted/80'
+          )}
+        >
+          <span className="text-sm leading-none">{r.emoji}</span>
+          {r.count > 1 && <span className="tabular-nums">{r.count}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Bubble ───────────────────────────────────────────────────────────────────
 export function MessageBubble({
-  message, isMe, meId, myUsername, otherUsername, replyTo, onLongPress, onRetry,
+  message, isMe, meId, myUsername, otherUsername, replyTo, onLongPress, onReact, onRetry,
 }: MessageBubbleProps) {
   const isFailed = message.deliveryStatus === 'failed'
   const lp = useLongPress(onLongPress, 450)
@@ -189,7 +218,7 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn('flex w-full select-none', isMe ? 'justify-end' : 'justify-start')}
+      className={cn('flex w-full select-none flex-col', isMe ? 'items-end' : 'items-start')}
       {...lp}
       onContextMenu={e => { e.preventDefault(); onLongPress() }}
     >
@@ -269,6 +298,15 @@ export function MessageBubble({
           {isMe && <DeliveryTick status={message.deliveryStatus} />}
         </div>
       </div>
+
+      {/* Reactions sit outside the bubble, aligned to the same side */}
+      {(message.reactions?.length ?? 0) > 0 && (
+        <ReactionBar
+          reactions={message.reactions!}
+          isMe={isMe}
+          onToggle={onReact}
+        />
+      )}
     </div>
   )
 }

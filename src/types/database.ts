@@ -75,6 +75,15 @@ export interface DbMessageStatus {
   read_at:      string | null
 }
 
+export interface DbMessageReaction {
+  id:              string
+  message_id:      string
+  conversation_id: string
+  user_id:         string
+  emoji:           string
+  created_at:      string
+}
+
 // ---------------------------------------------------------------
 // Supabase Database generic — must match GenericSchema shape from
 // @supabase/supabase-js (each table needs Row/Insert/Update/Relationships).
@@ -128,6 +137,12 @@ export interface Database {
         Row:           DbMessageStatus
         Insert:        Pick<DbMessageStatus, 'message_id'>
         Update:        Partial<Pick<DbMessageStatus, 'delivered_at' | 'read_at'>>
+        Relationships: []
+      }
+      message_reactions: {
+        Row:           DbMessageReaction
+        Insert:        Pick<DbMessageReaction, 'message_id' | 'conversation_id' | 'user_id' | 'emoji'>
+        Update:        never
         Relationships: []
       }
     }

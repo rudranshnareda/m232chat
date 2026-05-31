@@ -4,10 +4,13 @@ import { Reply, Trash2, Info, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message } from '@/types'
 
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
 interface MessageActionSheetProps {
   message:       Message
   isMe:          boolean
   onReply:       () => void
+  onReact:       (emoji: string) => void
   onDeleteForMe: () => void
   onDeleteForBoth?: () => void   // only provided when isMe
   onInfo:        () => void
@@ -60,8 +63,12 @@ function ActionRow({
 
 // ── Sheet ──────────────────────────────────────────────────────────────────
 export function MessageActionSheet({
-  message, isMe, onReply, onDeleteForMe, onDeleteForBoth, onInfo, onClose,
+  message, isMe, onReply, onReact, onDeleteForMe, onDeleteForBoth, onInfo, onClose,
 }: MessageActionSheetProps) {
+  const myReactions = new Set(
+    (message.reactions ?? []).filter(r => r.byMe).map(r => r.emoji)
+  )
+
   return (
     <>
       {/* Backdrop */}
@@ -78,6 +85,25 @@ export function MessageActionSheet({
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        {/* Reaction row */}
+        <div className="mb-3 flex items-center justify-around rounded-2xl bg-muted px-2 py-2">
+          {REACTION_EMOJIS.map(emoji => (
+            <button
+              key={emoji}
+              onClick={() => { onReact(emoji); onClose() }}
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-full text-xl transition-all active:scale-90',
+                myReactions.has(emoji)
+                  ? 'bg-primary/20 ring-2 ring-primary/40 scale-110'
+                  : 'hover:bg-background hover:scale-110'
+              )}
+              aria-label={`React with ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
         </div>
 
         <div className="space-y-0.5">

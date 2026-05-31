@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
-import type { DbConversation, DbConversationSetting, DbMessage, DbMessageStatus } from '@/types/database'
-import type { Message } from '@/types'
+import type { DbConversation, DbConversationSetting, DbMessage, DbMessageReaction, DbMessageStatus } from '@/types/database'
+import type { Message, MessageReaction } from '@/types'
 
 interface RouteContext {
   params: Promise<{ conversationId: string }>
@@ -82,8 +82,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     visible.map(r => r.reply_to_message_id).filter(Boolean) as string[]
   )]
 
-  // Batch: message_status + reply-to rows in parallel
-  const [statusRows, replyRows] = await Promise.all([
+  // Batch: message_status + reply-to rows + reactions in parallel
+  const [statusRows, replyRows, reactionRows] = await Promise.all([
     (async () => {
       const { data } = await admin
         .from('message_status')
@@ -106,19 +106,46 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
           return data ?? []
         })()
       : Promise.resolve([] as Pick<DbMessage, 'id' | 'sender_id' | 'content' | 'message_type'>[]),
+    visibleIds.length > 0
+      ? (async () => {
+          const { data } = await admin
+            .from('message_reactions')
+            .select('message_id, user_id, emoji')
+            .in('message_id', visibleIds) as {
+              data: Pick<DbMessageReaction, 'message_id' | 'user_id' | 'emoji'>[] | null
+              error: unknown
+            }
+          return data ?? []
+        })()
+      : Promise.resolve([] as Pick<DbMessageReaction, 'message_id' | 'user_id' | 'emoji'>[]),
   ])
 
   const statusMap = new Map(statusRows.map(s => [s.message_id, s]))
   const replyMap  = new Map(replyRows.map(r => [r.id, r]))
 
+  // Group raw reaction rows into MessageReaction[] per message
+  const reactionsMap = new Map<string, MessageReaction[]>()
+  for (const r of reactionRows) {
+    const arr = reactionsMap.get(r.message_id) ?? []
+    const existing = arr.find(x => x.emoji === r.emoji)
+    if (existing) {
+      existing.count++
+      if (r.user_id === meId) existing.byMe = true
+    } else {
+      arr.push({ emoji: r.emoji, count: 1, byMe: r.user_id === meId })
+    }
+    reactionsMap.set(r.message_id, arr)
+  }
+
   const messages = visible.reverse().map(row => {
-    const status  = statusMap.get(row.id)
+    const status   = statusMap.get(row.id)
     const replyRow = row.reply_to_message_id ? replyMap.get(row.reply_to_message_id) : null
 
     return {
       ...toMessage(row),
       deliveredAt: status?.delivered_at ?? null,
       readAt:      status?.read_at      ?? null,
+      reactions:   reactionsMap.get(row.id) ?? [],
       replyTo: replyRow
         ? {
             id:          replyRow.id,
