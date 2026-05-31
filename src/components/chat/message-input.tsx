@@ -201,8 +201,16 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
       setValue('')
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
-        textareaRef.current.focus()   // keep keyboard open and cursor in box
+        textareaRef.current.focus()
       }
+    }
+
+    // On iOS, tapping the send button fires touchend → blur → keyboard closes
+    // before onClick even runs. Intercepting touchend and calling preventDefault()
+    // stops the synthetic click (and the blur), then we trigger the send manually.
+    const handleSendTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+      handleSend()
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -327,7 +335,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {onSendMedia && (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                onPointerDown={e => e.preventDefault()}
                 disabled={disabled || isSendingMedia}
                 aria-label="Attach media"
                 className={cn(
@@ -344,7 +351,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {showMic && (
               <button
                 onClick={startRecording}
-                onPointerDown={e => e.preventDefault()}
                 disabled={disabled || isSendingMedia}
                 aria-label="Record voice note"
                 className={cn(
@@ -361,7 +367,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {!showMic && (
               <button
                 onClick={handleSend}
-                onPointerDown={e => e.preventDefault()}
+                onTouchEnd={handleSendTouchEnd}
                 disabled={!canSend || !!isSendingMedia}
                 aria-label="Send message"
                 className={cn(
