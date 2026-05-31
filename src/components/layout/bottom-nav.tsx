@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { MessageCircle, Search, UserCheck, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { ChatRequest } from '@/types'
 
 const TABS = [
   { href: '/chats',    icon: MessageCircle, label: 'Chats'    },
@@ -12,8 +14,23 @@ const TABS = [
   { href: '/profile',  icon: User,          label: 'Profile'  },
 ] as const
 
+async function fetchRequests(): Promise<ChatRequest[]> {
+  const res = await fetch('/api/requests')
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.requests as ChatRequest[]
+}
+
 export function BottomNav() {
   const pathname = usePathname()
+
+  const { data: requestCount = 0 } = useQuery({
+    queryKey:        ['requests'],
+    queryFn:         fetchRequests,
+    staleTime:       15_000,
+    refetchInterval: 30_000,
+    select:          (data) => data.length,
+  })
 
   return (
     <nav
@@ -22,7 +39,10 @@ export function BottomNav() {
     >
       <div className="flex h-14">
         {TABS.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href
+          const isActive   = pathname === href
+          const isRequests = href === '/requests'
+          const badge      = isRequests && requestCount > 0 ? requestCount : 0
+
           return (
             <Link
               key={href}
@@ -34,10 +54,17 @@ export function BottomNav() {
                   : 'text-muted-foreground active:text-primary/70'
               )}
             >
-              <Icon
-                className="h-[22px] w-[22px]"
-                strokeWidth={isActive ? 2.5 : 1.75}
-              />
+              <div className="relative">
+                <Icon
+                  className="h-[22px] w-[22px]"
+                  strokeWidth={isActive ? 2.5 : 1.75}
+                />
+                {badge > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-white">
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </div>
               <span className={cn('text-[10px]', isActive ? 'font-semibold' : 'font-normal')}>
                 {label}
               </span>

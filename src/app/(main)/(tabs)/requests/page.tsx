@@ -48,6 +48,7 @@ export default function RequestsPage() {
       respond(senderId, action),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requests'] })
+      qc.invalidateQueries({ queryKey: ['conversations'] })
       // Bust profile cache so profile pages show updated connection status
       qc.invalidateQueries({ queryKey: ['user-profile'] })
       qc.invalidateQueries({ queryKey: ['user-search'] })
