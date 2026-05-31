@@ -153,6 +153,10 @@ export default function ChatPage({ params }: ChatPageProps) {
   const prevCountRef = useRef(0)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
 
+  // Tracks whether the user is at/near the bottom. Kept as a ref (not state)
+  // so the ResizeObserver callback can read it without a stale closure.
+  const atBottomRef = useRef(true)
+
   const isNearBottom = useCallback(() => {
     const el = scrollRef.current
     if (!el) return true
@@ -161,6 +165,7 @@ export default function ChatPage({ params }: ChatPageProps) {
 
   const scrollToBottom = useCallback((smooth = false) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
+    atBottomRef.current = true
     setShowScrollBtn(false)
   }, [])
 
@@ -178,7 +183,28 @@ export default function ChatPage({ params }: ChatPageProps) {
     else setShowScrollBtn(true)
   }, [messages.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleScroll = useCallback(() => { setShowScrollBtn(!isNearBottom()) }, [isNearBottom])
+  const handleScroll = useCallback(() => {
+    const near = isNearBottom()
+    atBottomRef.current = near
+    setShowScrollBtn(!near)
+  }, [isNearBottom])
+
+  // ── Keyboard-open scroll fix ──────────────────────────────────────────────
+  // When the mobile keyboard opens, the scroll container shrinks (flex-1 + dvh)
+  // but scrollTop does not change, pushing recent messages below the fold.
+  // ResizeObserver detects the height change and re-pins to the bottom when
+  // the user was already there. Reading older messages is left undisturbed.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      if (atBottomRef.current) {
+        el.scrollTop = el.scrollHeight - el.clientHeight
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const handleScrollTop = useCallback(async () => {
     const el = scrollRef.current
