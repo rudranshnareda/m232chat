@@ -10,12 +10,16 @@ const RETENTION_DAYS = 30
  *
  * Two-phase approach:
  *
- * PHASE 1 — hide from UI (soft-delete, any age):
- *   sender_saved=F  receiver_saved=T  → set deleted_for_sender_at   (hide from sender's view)
- *   sender_saved=T  receiver_saved=F  → set deleted_for_receiver_at (hide from receiver's view)
+ * PHASE 1 — hide from UI on refresh (soft-delete, any age):
+ *   Any message where the current user's saved flag is false gets soft-deleted
+ *   from their view so it disappears after a reload.
  *
- * PHASE 2 — remove from DB (hard-delete, only after RETENTION_DAYS):
- *   sender_saved=F  receiver_saved=F  → delete row + storage if older than 30 days
+ *   sender_saved=F  receiver_saved=F  → soft-delete from this user's view
+ *   sender_saved=F  receiver_saved=T  → soft-delete from sender's view only
+ *   sender_saved=T  receiver_saved=F  → soft-delete from receiver's view only
+ *
+ * PHASE 2 — remove from DB after RETENTION_DAYS:
+ *   sender_saved=F  receiver_saved=F  → hard-delete row + storage after 30 days
  *
  * This means ephemeral messages stay on the server for up to 30 days even after
  * they've been hidden from the UI, giving a safety buffer for data recovery.
@@ -57,23 +61,33 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
   if (!messages?.length) return
 
   // 3. Bucket messages
-  const hardDeleteIds:        string[] = []  // both opted out + older than retention → wipe
-  const softDeleteAsSender:   string[] = []  // I sent, I opted out, they saved → hide from my view
-  const softDeleteAsReceiver: string[] = []  // they sent, I opted out, they saved → hide from my view
+  const hardDeleteIds:        string[] = []
+  const softDeleteAsSender:   string[] = []
+  const softDeleteAsReceiver: string[] = []
 
   for (const msg of messages) {
-    const iAmSender  = msg.sender_id === userId
-    const isExpired  = msg.created_at < retentionCutoff
+    const iAmSender = msg.sender_id === userId
+    const isExpired = msg.created_at < retentionCutoff
+    const bothEphemeral = msg.sender_saved === false && msg.receiver_saved === false
 
-    if (msg.sender_saved === false && msg.receiver_saved === false) {
-      // Both opted out: hard-delete only after retention period
-      if (isExpired) hardDeleteIds.push(msg.id)
-      // (If not yet expired, soft-deletes below handle hiding from each user's view
-      //  when their respective cleanup runs — no action needed here for the
-      //  "both off" case since both will soft-delete from their own side)
+    if (bothEphemeral) {
+      if (isExpired) {
+        // Old enough — remove from DB entirely
+        hardDeleteIds.push(msg.id)
+      } else {
+        // Still within retention window — soft-delete from THIS user's view
+        // so it disappears on refresh while staying in the DB
+        if (iAmSender && msg.deleted_for_sender_at === null) {
+          softDeleteAsSender.push(msg.id)
+        } else if (!iAmSender && msg.deleted_for_receiver_at === null) {
+          softDeleteAsReceiver.push(msg.id)
+        }
+      }
     } else if (iAmSender && msg.sender_saved === false && msg.deleted_for_sender_at === null) {
+      // I sent it, I opted out, they saved — hide from my view only
       softDeleteAsSender.push(msg.id)
     } else if (!iAmSender && msg.receiver_saved === false && msg.deleted_for_receiver_at === null) {
+      // They sent it, I opted out, they saved — hide from my view only
       softDeleteAsReceiver.push(msg.id)
     }
   }

@@ -312,6 +312,13 @@ export default function ChatPage({ params }: ChatPageProps) {
                 ? (msg.replyTo ?? messagesById.get(msg.replyToMessageId) ?? null)
                 : null
 
+              // Detect history setting change from the current user's perspective.
+              // myFlag = the flag that controls whether I see this message after a refresh.
+              const myFlag     = (m: typeof msg) => m.senderId === me?.id ? m.senderSaved : m.receiverSaved
+              const flagNow    = myFlag(msg)
+              const flagPrev   = prev ? myFlag(prev) : flagNow
+              const showHistorySep = !!prev && flagNow !== flagPrev
+
               return (
                 <div key={msg.id}>
                   {showSep && (
@@ -319,6 +326,15 @@ export default function ChatPage({ params }: ChatPageProps) {
                       <div className="h-px flex-1 bg-border" />
                       <span className="text-[10px] text-muted-foreground">{dayLabel(msg.createdAt)}</span>
                       <div className="h-px flex-1 bg-border" />
+                    </div>
+                  )}
+                  {showHistorySep && (
+                    <div className="my-2 flex items-center gap-3 px-1">
+                      <div className="h-px flex-1 border-t border-dashed border-border/60" />
+                      <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                        {flagNow ? 'history on' : 'history off'}
+                      </span>
+                      <div className="h-px flex-1 border-t border-dashed border-border/60" />
                     </div>
                   )}
                   <MessageBubble

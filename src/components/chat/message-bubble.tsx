@@ -48,10 +48,11 @@ function DeliveryTick({ status }: { status: MessageDeliveryStatus | undefined })
 
 // ── Reply quote ──────────────────────────────────────────────────────────────
 function ReplyQuote({
-  replyTo, isInMyBubble, meId, myUsername, otherUsername,
+  replyTo, isInMyBubble, isEphemeral, meId, myUsername, otherUsername,
 }: {
   replyTo:        Pick<Message, 'id' | 'senderId' | 'content' | 'messageType'>
-  isInMyBubble:   boolean   // true when the quoting message was sent by me
+  isInMyBubble:   boolean
+  isEphemeral:    boolean
   meId:           string
   myUsername?:    string
   otherUsername?: string
@@ -63,19 +64,26 @@ function ReplyQuote({
   return (
     <div className={cn(
       'mb-1.5 rounded-lg border-l-[3px] px-2 py-1',
-      isInMyBubble
-        ? 'border-primary-foreground/60 bg-primary-foreground/10'
-        : 'border-primary/60 bg-muted-foreground/10'
+      isInMyBubble && isEphemeral  ? 'border-violet-200/50 bg-violet-200/10'  :
+      isInMyBubble                 ? 'border-primary-foreground/60 bg-primary-foreground/10' :
+      isEphemeral                  ? 'border-violet-400/50 bg-violet-500/10'  :
+                                     'border-primary/60 bg-muted-foreground/10'
     )}>
       <p className={cn(
         'truncate text-[10px] font-semibold',
-        isInMyBubble ? 'text-primary-foreground/80' : 'text-primary'
+        isInMyBubble && isEphemeral  ? 'text-violet-100/90'  :
+        isInMyBubble                 ? 'text-primary-foreground/80' :
+        isEphemeral                  ? 'text-violet-400'     :
+                                       'text-primary'
       )}>
         {authorName}
       </p>
       <p className={cn(
         'truncate text-xs',
-        isInMyBubble ? 'text-primary-foreground/70' : 'text-muted-foreground'
+        isInMyBubble && isEphemeral  ? 'text-violet-100/70'  :
+        isInMyBubble                 ? 'text-primary-foreground/70' :
+        isEphemeral                  ? 'text-violet-300/80'  :
+                                       'text-muted-foreground'
       )}>
         {preview.length > 60 ? preview.slice(0, 60) + '…' : preview}
       </p>
@@ -176,6 +184,9 @@ export function MessageBubble({
   const isFailed = message.deliveryStatus === 'failed'
   const lp = useLongPress(onLongPress, 450)
 
+  // Ephemeral = this message will vanish for ME on the next refresh
+  const isEphemeral = isMe ? message.senderSaved === false : message.receiverSaved === false
+
   return (
     <div
       className={cn('flex w-full select-none', isMe ? 'justify-end' : 'justify-start')}
@@ -184,9 +195,10 @@ export function MessageBubble({
     >
       <div className={cn(
         'relative max-w-[75%] rounded-2xl px-3.5 py-2 text-sm',
-        isMe
-          ? 'rounded-br-sm bg-primary text-primary-foreground'
-          : 'rounded-bl-sm bg-muted text-foreground',
+        isMe && isEphemeral  ? 'rounded-br-sm bg-violet-600 text-white'            :
+        isMe                 ? 'rounded-br-sm bg-primary text-primary-foreground'   :
+        isEphemeral          ? 'rounded-bl-sm bg-violet-500/20 text-foreground'     :
+                               'rounded-bl-sm bg-muted text-foreground',
         message.isOptimistic && message.deliveryStatus === 'sending' && 'opacity-70',
         isFailed && 'opacity-60',
       )}>
@@ -195,6 +207,7 @@ export function MessageBubble({
           <ReplyQuote
             replyTo={replyTo}
             isInMyBubble={isMe}
+            isEphemeral={isEphemeral}
             meId={meId}
             myUsername={myUsername}
             otherUsername={otherUsername}
@@ -238,8 +251,11 @@ export function MessageBubble({
 
         {/* Footer: time + delivery tick */}
         <div className={cn(
-          'mt-0.5 flex items-center gap-1',
-          isMe ? 'justify-end text-primary-foreground/70' : 'justify-end text-muted-foreground'
+          'mt-0.5 flex items-center gap-1 justify-end',
+          isMe && isEphemeral  ? 'text-violet-200/80'       :
+          isMe                 ? 'text-primary-foreground/70' :
+          isEphemeral          ? 'text-violet-400/80'        :
+                                 'text-muted-foreground'
         )}>
           {isFailed && (
             <button
