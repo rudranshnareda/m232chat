@@ -39,7 +39,8 @@ export async function PATCH(request: NextRequest) {
     admin
       .from('user_sessions')
       .update({ last_ping_at: now })
-      .eq('id', sessionId),
+      .eq('id', sessionId)
+      .then(),
   ]
 
   if (shouldUpdate) {
@@ -48,6 +49,7 @@ export async function PATCH(request: NextRequest) {
         .from('users')
         .update({ last_seen_at: now })
         .eq('id', userId)
+        .then()
     )
   }
 
