@@ -12,7 +12,7 @@ interface AuthProviderProps {
 }
 
 const TOKEN_REFRESH_INTERVAL_MS = 13 * 60 * 1000   // 13 minutes
-const SESSION_PING_INTERVAL_MS  =  2 * 60 * 1000   //  2 minutes (was 30s — reduces DB writes 4×)
+const SESSION_PING_INTERVAL_MS  = 30 * 1000         // 30 seconds
 
 const PUBLIC_PATHS = ['/login', '/register']
 
