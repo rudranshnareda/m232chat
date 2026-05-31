@@ -4,7 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/server'
 import { signAccessToken, signRefreshToken } from '@/lib/jwt'
 import { setAuthCookies } from '@/lib/auth-cookies'
 import { runEphemeralCleanup } from '@/lib/ephemeral'
-import { BUCKETS, profilePhotoPath } from '@/lib/storage'
+import { BUCKETS, profilePhotoPath, profilePhotoUrl } from '@/lib/storage'
 import {
   validateUsername,
   validatePassword,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     user: {
       id:           userId,
       username:     username!.trim(),
-      profilePhoto: path,
+      profilePhoto: profilePhotoUrl(path),
       bio:          bioValue,
       sessionId:    session.id,
     },

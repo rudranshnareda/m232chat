@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbUser, DbChatRequest, DbConversation } from '@/types/database'
 import type { ConnectionStatus } from '@/types'
 
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     profile: {
       id:           user.id,
       username:     user.username,
-      profilePhoto: user.profile_photo,
+      profilePhoto: profilePhotoUrl(user.profile_photo),
       bio:          user.bio,
       lastSeenAt:   user.last_seen_at,
     },

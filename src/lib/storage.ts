@@ -17,7 +17,10 @@ export function chatMediaPath(conversationId: string, messageId: string, filenam
 }
 
 // Returns the public URL for a profile photo (profile-photos bucket is public).
-export function profilePhotoUrl(storagePath: string): string {
+// Accepts null (no photo) and already-resolved full URLs transparently.
+export function profilePhotoUrl(storagePath: string | null): string | null {
+  if (!storagePath) return null
+  if (storagePath.startsWith('http')) return storagePath  // already a full URL
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   return `${supabaseUrl}/storage/v1/object/public/profile-photos/${storagePath}`
 }

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbConversation, DbConversationSetting, DbMessage, DbMessageStatus, DbUser } from '@/types/database'
 
 // ── GET /api/conversations ─────────────────────────────────────────────────
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
           ? {
               id:           profile.id,
               username:     profile.username,
-              profilePhoto: profile.profile_photo,
+              profilePhoto: profilePhotoUrl(profile.profile_photo),
               bio:          profile.bio,
               lastSeenAt:   profile.last_seen_at,
             }

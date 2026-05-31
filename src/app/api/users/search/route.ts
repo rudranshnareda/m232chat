@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbUser, DbChatRequest } from '@/types/database'
 import type { ConnectionStatus } from '@/types'
 
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
     return {
       id:               row.id,
       username:         row.username,
-      profilePhoto:     row.profile_photo,
+      profilePhoto:     profilePhotoUrl(row.profile_photo),
       bio:              row.bio,
       lastSeenAt:       row.last_seen_at,
       connectionStatus,

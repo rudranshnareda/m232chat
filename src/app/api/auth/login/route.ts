@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/server'
 import { signAccessToken, signRefreshToken } from '@/lib/jwt'
 import { setAuthCookies } from '@/lib/auth-cookies'
 import { runEphemeralCleanup } from '@/lib/ephemeral'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbUser, DbUserSession } from '@/types/database'
 
 export async function POST(request: NextRequest) {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
     sub:          user.id,
     username:     user.username,
     sessionId:    session.id,
-    profilePhoto: user.profile_photo,
+    profilePhoto: profilePhotoUrl(user.profile_photo),
     bio:          user.bio,
   })
   const refreshToken = await signRefreshToken(user.id, session.id)
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
     user: {
       id:           user.id,
       username:     user.username,
-      profilePhoto: user.profile_photo,
+      profilePhoto: profilePhotoUrl(user.profile_photo),
       bio:          user.bio,
       sessionId:    session.id,
     },

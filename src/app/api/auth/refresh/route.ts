@@ -1,6 +1,7 @@
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from '@/lib/jwt'
 import { setAuthCookies, getRefreshToken } from '@/lib/auth-cookies'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbUser, DbUserSession } from '@/types/database'
 
 export async function POST() {
@@ -45,7 +46,7 @@ export async function POST() {
     sub:          user.id,
     username:     user.username,
     sessionId:    session.id,
-    profilePhoto: user.profile_photo,
+    profilePhoto: profilePhotoUrl(user.profile_photo),
     bio:          user.bio,
   })
   const newRefreshToken = await signRefreshToken(user.id, session.id)
@@ -62,7 +63,7 @@ export async function POST() {
     user: {
       id:           user.id,
       username:     user.username,
-      profilePhoto: user.profile_photo,
+      profilePhoto: profilePhotoUrl(user.profile_photo),
       bio:          user.bio,
       sessionId:    session.id,
     },

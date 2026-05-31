@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
+import { profilePhotoUrl } from '@/lib/storage'
 import type { DbChatRequest, DbUser } from '@/types/database'
 
 // ── GET /api/requests ──────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
         ? {
             id:           sender.id,
             username:     sender.username,
-            profilePhoto: sender.profile_photo,
+            profilePhoto: profilePhotoUrl(sender.profile_photo),
             bio:          sender.bio,
             lastSeenAt:   sender.last_seen_at,
           }
