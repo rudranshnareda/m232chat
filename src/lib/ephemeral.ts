@@ -1,28 +1,29 @@
 import { createSupabaseAdminClient } from './supabase/server'
 import { deleteChatMediaObjects } from './storage'
-import type { DbConversation, DbMessage, DbMessageMedia } from '@/types/database'
+import type { DbConversation, DbMessage, DbMessageMedia, DbMessageStatus } from '@/types/database'
 
 const RETENTION_DAYS = 30
 
 /**
- * Cleans up ephemeral messages for the given user across all their conversations.
- * Called on every page refresh from AuthProvider (not the first open of a tab).
+ * Ephemeral cleanup — called on every page refresh (not first open of a tab).
  *
- * Two-phase approach:
+ * Core rule:
+ *   • Sender's copy   → eligible for cleanup immediately (they composed it = already seen)
+ *   • Receiver's copy → eligible ONLY after read_at is set (they opened the chat and saw it)
  *
- * PHASE 1 — hide from UI on refresh (soft-delete, any age):
- *   Any message where the current user's saved flag is false gets soft-deleted
- *   from their view so it disappears after a reload.
+ * This prevents messages from vanishing before the recipient has had a
+ * chance to read them, even if they refresh the app.
  *
- *   sender_saved=F  receiver_saved=F  → soft-delete from this user's view
- *   sender_saved=F  receiver_saved=T  → soft-delete from sender's view only
- *   sender_saved=T  receiver_saved=F  → soft-delete from receiver's view only
+ * Visibility matrix after cleanup on refresh:
  *
- * PHASE 2 — remove from DB after RETENTION_DAYS:
- *   sender_saved=F  receiver_saved=F  → hard-delete row + storage after 30 days
- *
- * This means ephemeral messages stay on the server for up to 30 days even after
- * they've been hidden from the UI, giving a safety buffer for data recovery.
+ *   sender_saved  receiver_saved  seen by receiver?  → action
+ *   ──────────────────────────────────────────────────────────
+ *   false         false           no   → soft-delete sender copy only; receiver copy kept
+ *   false         false           yes  → soft-delete both copies (hard-delete after 30 days)
+ *   false         true            -    → soft-delete sender copy only
+ *   true          false           no   → nothing (receiver hasn't seen it yet)
+ *   true          false           yes  → soft-delete receiver copy only
+ *   true          true            -    → nothing (both saving)
  */
 export async function runEphemeralCleanup(userId: string): Promise<void> {
   const admin = createSupabaseAdminClient()
@@ -44,7 +45,7 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
 
   const conversationIds = convRows.map((c) => c.id)
 
-  // 2. Fetch all non-hard-deleted messages, with their saved flags + timestamps
+  // 2. Fetch all non-hard-deleted messages
   const { data: messages } = await admin
     .from('messages')
     .select('id, sender_id, sender_saved, receiver_saved, deleted_for_sender_at, deleted_for_receiver_at, created_at')
@@ -60,39 +61,58 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
 
   if (!messages?.length) return
 
-  // 3. Bucket messages
+  const messageIds = messages.map((m) => m.id)
+
+  // 3. Fetch read_at for each message so we know which ones the recipient has seen
+  const { data: statusRows } = await admin
+    .from('message_status')
+    .select('message_id, read_at')
+    .in('message_id', messageIds) as {
+      data: Pick<DbMessageStatus, 'message_id' | 'read_at'>[] | null
+      error: unknown
+    }
+
+  const readAtMap = new Map(
+    (statusRows ?? []).map((s) => [s.message_id, s.read_at])
+  )
+
+  // 4. Bucket messages
   const hardDeleteIds:        string[] = []
   const softDeleteAsSender:   string[] = []
   const softDeleteAsReceiver: string[] = []
 
   for (const msg of messages) {
-    const iAmSender = msg.sender_id === userId
-    const isExpired = msg.created_at < retentionCutoff
+    const iAmSender    = msg.sender_id === userId
+    const isExpired    = msg.created_at < retentionCutoff
     const bothEphemeral = msg.sender_saved === false && msg.receiver_saved === false
+    // A message is "seen by receiver" when message_status.read_at is set.
+    // Senders always count as having seen their own message (they typed it).
+    const seenByReceiver = !!readAtMap.get(msg.id)
 
     if (bothEphemeral) {
       if (isExpired) {
-        // Old enough — remove from DB entirely
+        // Old enough — remove from DB entirely (hard delete)
         hardDeleteIds.push(msg.id)
-      } else {
-        // Still within retention window — soft-delete from THIS user's view
-        // so it disappears on refresh while staying in the DB
-        if (iAmSender && msg.deleted_for_sender_at === null) {
-          softDeleteAsSender.push(msg.id)
-        } else if (!iAmSender && msg.deleted_for_receiver_at === null) {
-          softDeleteAsReceiver.push(msg.id)
-        }
+        continue
+      }
+      // Sender copy: always eligible (sender saw it when they sent it)
+      if (iAmSender && msg.deleted_for_sender_at === null) {
+        softDeleteAsSender.push(msg.id)
+      }
+      // Receiver copy: only if they've actually read it
+      if (!iAmSender && seenByReceiver && msg.deleted_for_receiver_at === null) {
+        softDeleteAsReceiver.push(msg.id)
       }
     } else if (iAmSender && msg.sender_saved === false && msg.deleted_for_sender_at === null) {
-      // I sent it, I opted out, they saved — hide from my view only
+      // I sent it with history off — hide my copy (I saw it when I sent it)
       softDeleteAsSender.push(msg.id)
-    } else if (!iAmSender && msg.receiver_saved === false && msg.deleted_for_receiver_at === null) {
-      // They sent it, I opted out, they saved — hide from my view only
+    } else if (!iAmSender && msg.receiver_saved === false && seenByReceiver && msg.deleted_for_receiver_at === null) {
+      // They sent it, I have history off, and I've read it — hide from my view
       softDeleteAsReceiver.push(msg.id)
     }
   }
 
-  // 4. Hard delete expired messages: storage first, then DB rows
+  // 5. Hard delete expired messages: storage first, then DB rows
   if (hardDeleteIds.length > 0) {
     const { data: mediaRows } = await admin
       .from('message_media')
@@ -106,13 +126,10 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
       await deleteChatMediaObjects(mediaRows.map((m) => m.storage_path))
     }
 
-    await admin
-      .from('messages')
-      .delete()
-      .in('id', hardDeleteIds)
+    await admin.from('messages').delete().in('id', hardDeleteIds)
   }
 
-  // 5. Soft-delete from sender's view
+  // 6. Soft-delete from sender's view
   if (softDeleteAsSender.length > 0) {
     await admin
       .from('messages')
@@ -120,7 +137,7 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
       .in('id', softDeleteAsSender)
   }
 
-  // 6. Soft-delete from receiver's view
+  // 7. Soft-delete from receiver's view
   if (softDeleteAsReceiver.length > 0) {
     await admin
       .from('messages')
