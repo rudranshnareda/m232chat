@@ -205,18 +205,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
       }
     }
 
-    // On mobile (Android + iOS) the browser moves focus to the tapped button
-    // during touchstart, which blurs the textarea and closes the keyboard.
-    // preventDefault on touchstart cancels that focus change.
-    // We then fire the send manually on touchend (onClick still handles desktop).
-    const handleSendTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
-      e.preventDefault()
-    }
-    const handleSendTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
-      e.preventDefault()
-      handleSend()
-    }
-
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
@@ -368,24 +356,27 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             )}
 
             {/* Send (only when text is present) */}
+            {/* Using div instead of button so tapping it cannot steal focus   */}
+            {/* from the textarea — buttons are focusable and blur the input,  */}
+            {/* dismissing the mobile keyboard. A div with no tabIndex is not  */}
+            {/* focusable, so the keyboard stays open after every send.        */}
             {!showMic && (
-              <button
-                onClick={handleSend}
-                onTouchStart={handleSendTouchStart}
-                onTouchEnd={handleSendTouchEnd}
-                disabled={!canSend || !!isSendingMedia}
+              <div
+                role="button"
                 aria-label="Send message"
+                aria-disabled={!canSend || !!isSendingMedia}
+                onClick={canSend && !isSendingMedia ? handleSend : undefined}
                 className={cn(
-                  'mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-                  'bg-primary text-primary-foreground transition-opacity disabled:opacity-30',
-                  canSend && !isSendingMedia && 'hover:opacity-90',
+                  'mb-0.5 flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full',
+                  'bg-primary text-primary-foreground transition-opacity',
+                  (!canSend || !!isSendingMedia) ? 'opacity-30' : 'cursor-pointer hover:opacity-90',
                 )}
               >
                 {isSendingMedia
                   ? <Loader2 className="h-4 w-4 animate-spin" />
                   : <Send    className="h-4 w-4" />
                 }
-              </button>
+              </div>
             )}
           </div>
         )}
