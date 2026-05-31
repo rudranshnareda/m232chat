@@ -249,9 +249,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         {!isLoading && !loadError && messages.length === 0 && (
           <div className="flex flex-1 items-center justify-center">
             <p className="text-sm text-muted-foreground">
-              {saveHistory === false
-                ? 'Ephemeral chat — no history loaded'
-                : `Say hello${otherUser ? ` to @${otherUser.username}` : ''}! 👋`}
+              {`Say hello${otherUser ? ` to @${otherUser.username}` : ''}! 👋`}
             </p>
           </div>
         )}

@@ -93,13 +93,9 @@ export function useChatMessages(
     setMessages([])
     setLoadError(null)
 
-    if (saveHistory === false) {
-      setIsLoading(false)
-      loadedRef.current = true
-      markRead()
-      return
-    }
-
+    // Even in ephemeral mode we load messages from the DB — they exist until
+    // the next login triggers cleanup. Skipping the fetch here meant any
+    // message sent while the app was closed was silently lost.
     setIsLoading(true)
     fetch(`/api/conversations/${conversationId}/messages`)
       .then(r => r.json())
