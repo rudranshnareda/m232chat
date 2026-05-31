@@ -205,9 +205,13 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
       }
     }
 
-    // On iOS, tapping the send button fires touchend → blur → keyboard closes
-    // before onClick even runs. Intercepting touchend and calling preventDefault()
-    // stops the synthetic click (and the blur), then we trigger the send manually.
+    // On mobile (Android + iOS) the browser moves focus to the tapped button
+    // during touchstart, which blurs the textarea and closes the keyboard.
+    // preventDefault on touchstart cancels that focus change.
+    // We then fire the send manually on touchend (onClick still handles desktop).
+    const handleSendTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+    }
     const handleSendTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
       e.preventDefault()
       handleSend()
@@ -367,6 +371,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {!showMic && (
               <button
                 onClick={handleSend}
+                onTouchStart={handleSendTouchStart}
                 onTouchEnd={handleSendTouchEnd}
                 disabled={!canSend || !!isSendingMedia}
                 aria-label="Send message"
