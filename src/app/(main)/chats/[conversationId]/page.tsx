@@ -424,7 +424,7 @@ export default function ChatPage({ params }: ChatPageProps) {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {meta?.saveHistory
                     ? 'Messages are kept between sessions.'
-                    : 'Messages vanish when you reload the app. Only affects your view.'}
+                    : 'Messages vanish from your view when you reload. Kept on server for 30 days.'}
                 </p>
               </div>
             </button>

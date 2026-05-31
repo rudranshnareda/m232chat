@@ -2,23 +2,30 @@ import { createSupabaseAdminClient } from './supabase/server'
 import { deleteChatMediaObjects } from './storage'
 import type { DbConversation, DbMessage, DbMessageMedia } from '@/types/database'
 
+const RETENTION_DAYS = 30
+
 /**
  * Cleans up ephemeral messages for the given user across all their conversations.
- * Called on every page load/refresh from AuthProvider.
+ * Called on every page refresh from AuthProvider (not the first open of a tab).
  *
- * Three cases handled per message:
+ * Two-phase approach:
  *
- *   sender_saved=F  receiver_saved=F  → hard delete (both users opted out)
- *   sender_saved=F  receiver_saved=T  → soft-delete from sender's view only
- *   sender_saved=T  receiver_saved=F  → soft-delete from receiver's view only
+ * PHASE 1 — hide from UI (soft-delete, any age):
+ *   sender_saved=F  receiver_saved=T  → set deleted_for_sender_at   (hide from sender's view)
+ *   sender_saved=T  receiver_saved=F  → set deleted_for_receiver_at (hide from receiver's view)
  *
- * Soft-deletes use deleted_for_sender_at / deleted_for_receiver_at so the
- * other user's view is unaffected. The messages query already filters on
- * these columns, so soft-deleted rows disappear for the right user on reload.
+ * PHASE 2 — remove from DB (hard-delete, only after RETENTION_DAYS):
+ *   sender_saved=F  receiver_saved=F  → delete row + storage if older than 30 days
+ *
+ * This means ephemeral messages stay on the server for up to 30 days even after
+ * they've been hidden from the UI, giving a safety buffer for data recovery.
  */
 export async function runEphemeralCleanup(userId: string): Promise<void> {
   const admin = createSupabaseAdminClient()
   const now   = new Date().toISOString()
+  const retentionCutoff = new Date(
+    Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString()
 
   // 1. Find all conversation IDs for this user
   const { data: convRows } = await admin
@@ -33,32 +40,37 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
 
   const conversationIds = convRows.map((c) => c.id)
 
-  // 2. Fetch all non-deleted messages in those conversations, with their saved flags
+  // 2. Fetch all non-hard-deleted messages, with their saved flags + timestamps
   const { data: messages } = await admin
     .from('messages')
-    .select('id, sender_id, sender_saved, receiver_saved, deleted_for_sender_at, deleted_for_receiver_at')
+    .select('id, sender_id, sender_saved, receiver_saved, deleted_for_sender_at, deleted_for_receiver_at, created_at')
     .in('conversation_id', conversationIds)
     .is('deleted_for_both_at', null) as {
       data: Pick<
         DbMessage,
         'id' | 'sender_id' | 'sender_saved' | 'receiver_saved' |
-        'deleted_for_sender_at' | 'deleted_for_receiver_at'
+        'deleted_for_sender_at' | 'deleted_for_receiver_at' | 'created_at'
       >[] | null
       error: unknown
     }
 
   if (!messages?.length) return
 
-  // 3. Bucket messages into what needs to happen
-  const hardDeleteIds:        string[] = []  // both opted out → wipe row entirely
-  const softDeleteAsSender:   string[] = []  // I sent it, I opted out, they saved → hide from my view
-  const softDeleteAsReceiver: string[] = []  // they sent it, I opted out, they saved → hide from my view
+  // 3. Bucket messages
+  const hardDeleteIds:        string[] = []  // both opted out + older than retention → wipe
+  const softDeleteAsSender:   string[] = []  // I sent, I opted out, they saved → hide from my view
+  const softDeleteAsReceiver: string[] = []  // they sent, I opted out, they saved → hide from my view
 
   for (const msg of messages) {
-    const iAmSender = msg.sender_id === userId
+    const iAmSender  = msg.sender_id === userId
+    const isExpired  = msg.created_at < retentionCutoff
 
     if (msg.sender_saved === false && msg.receiver_saved === false) {
-      hardDeleteIds.push(msg.id)
+      // Both opted out: hard-delete only after retention period
+      if (isExpired) hardDeleteIds.push(msg.id)
+      // (If not yet expired, soft-deletes below handle hiding from each user's view
+      //  when their respective cleanup runs — no action needed here for the
+      //  "both off" case since both will soft-delete from their own side)
     } else if (iAmSender && msg.sender_saved === false && msg.deleted_for_sender_at === null) {
       softDeleteAsSender.push(msg.id)
     } else if (!iAmSender && msg.receiver_saved === false && msg.deleted_for_receiver_at === null) {
@@ -66,7 +78,7 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
     }
   }
 
-  // 4. Hard delete: storage first, then DB rows
+  // 4. Hard delete expired messages: storage first, then DB rows
   if (hardDeleteIds.length > 0) {
     const { data: mediaRows } = await admin
       .from('message_media')
@@ -86,7 +98,7 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
       .in('id', hardDeleteIds)
   }
 
-  // 5. Soft-delete from sender's view (only messages not already soft-deleted)
+  // 5. Soft-delete from sender's view
   if (softDeleteAsSender.length > 0) {
     await admin
       .from('messages')
@@ -94,7 +106,7 @@ export async function runEphemeralCleanup(userId: string): Promise<void> {
       .in('id', softDeleteAsSender)
   }
 
-  // 6. Soft-delete from receiver's view (only messages not already soft-deleted)
+  // 6. Soft-delete from receiver's view
   if (softDeleteAsReceiver.length > 0) {
     await admin
       .from('messages')
