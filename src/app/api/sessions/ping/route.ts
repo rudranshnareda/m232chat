@@ -35,7 +35,7 @@ export async function PATCH(request: NextRequest) {
   const lastSeenAt   = lastSeenHeader ? new Date(lastSeenHeader).getTime() : 0
   const shouldUpdate = Date.now() - lastSeenAt >= LAST_SEEN_UPDATE_INTERVAL_MS
 
-  const updates: Promise<unknown>[] = [
+  const updates: PromiseLike<unknown>[] = [
     admin
       .from('user_sessions')
       .update({ last_ping_at: now })
