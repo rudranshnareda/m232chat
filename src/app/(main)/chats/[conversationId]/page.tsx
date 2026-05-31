@@ -375,7 +375,7 @@ export default function ChatPage({ params }: ChatPageProps) {
         ref={inputRef}
         onSend={handleSend}
         onSendMedia={(file) => sendMedia(file, replyTo?.id ?? null)}
-        disabled={isSending || metaError}
+        disabled={metaError}
         isSendingMedia={isSendingMedia}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}

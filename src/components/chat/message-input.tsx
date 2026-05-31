@@ -197,12 +197,15 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
     const handleSend = () => {
       const trimmed = value.trim()
       if (!trimmed || disabled) return
-      onSend(trimmed)
-      setValue('')
+      // Assert focus BEFORE triggering onSend. onSend is async and causes the
+      // parent to re-render. Keeping focus here means the textarea never blurs
+      // even if a parent re-render races with this call.
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
         textareaRef.current.focus()
       }
+      onSend(trimmed)
+      setValue('')
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
