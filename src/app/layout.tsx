@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="en" className={`${geist.variable} h-full`}>
+    <html lang="en" className={`${geist.variable} dark h-full`}>
       <body className="h-full bg-background text-foreground antialiased">
         <QueryProvider>
           <AuthProvider initialUser={initialUser} initialToken={initialToken}>
