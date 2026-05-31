@@ -74,11 +74,21 @@ export function AuthProvider({ children, initialUser, initialToken }: AuthProvid
         if (!isPublicRoute) startIntervals()
       }
       setInitialized()
-      // Fire-and-forget ephemeral cleanup on every page load / refresh.
-      // This is what makes history=off feel ephemeral — messages vanish
-      // when you reload, not just when you log out.
+      // Fire-and-forget ephemeral cleanup — but only on REFRESH, not on
+      // the very first open of a tab session. This lets users see messages
+      // that arrived while the app was closed; messages vanish only after
+      // they reload/refresh, not the moment they first open the app.
+      //
+      // sessionStorage survives F5 / Ctrl+R (same tab) but is cleared
+      // when the tab is closed and a new one is opened — exactly the
+      // boundary we want.
       if (!isPublicRoute) {
-        fetch('/api/cleanup', { method: 'POST' }).catch(() => {})
+        const SESSION_KEY = 'm232-session-loaded'
+        const isReload    = sessionStorage.getItem(SESSION_KEY) !== null
+        sessionStorage.setItem(SESSION_KEY, '1')
+        if (isReload) {
+          fetch('/api/cleanup', { method: 'POST' }).catch(() => {})
+        }
       }
     }
 
