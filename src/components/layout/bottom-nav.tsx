@@ -27,8 +27,8 @@ export function BottomNav() {
   const { data: requestCount = 0 } = useQuery({
     queryKey:        ['requests'],
     queryFn:         fetchRequests,
-    staleTime:       15_000,
-    refetchInterval: 30_000,
+    staleTime:       60_000,
+    refetchInterval: 2 * 60_000,
     select:          (data) => data.length,
   })
 

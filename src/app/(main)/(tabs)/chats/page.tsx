@@ -69,8 +69,8 @@ export default function ChatsPage() {
   const { data: conversations = [], isLoading, isError, refetch } = useQuery({
     queryKey:        ['conversations'],
     queryFn:         fetchConversations,
-    staleTime:       20_000,
-    refetchInterval: 30_000,
+    staleTime:       60_000,
+    refetchInterval: 2 * 60_000,
   })
 
   return (

@@ -12,7 +12,7 @@ interface AuthProviderProps {
 }
 
 const TOKEN_REFRESH_INTERVAL_MS = 13 * 60 * 1000   // 13 minutes
-const SESSION_PING_INTERVAL_MS  = 30 * 1000          // 30 seconds
+const SESSION_PING_INTERVAL_MS  =  2 * 60 * 1000   //  2 minutes (was 30s — reduces DB writes 4×)
 
 const PUBLIC_PATHS = ['/login', '/register']
 
@@ -38,15 +38,24 @@ export function AuthProvider({ children, initialUser, initialToken }: AuthProvid
     }
   }, [updateToken])
 
+  // Track when last_seen_at was last written so we can skip the users
+  // table update on most pings (server only writes it every 5 min).
+  const lastSeenAtRef = useRef<string | null>(null)
+
   const doPing = useCallback(async () => {
     try {
-      const res = await fetch('/api/sessions/ping', { method: 'PATCH' })
+      const headers: Record<string, string> = {}
+      if (lastSeenAtRef.current) headers['x-last-seen-at'] = lastSeenAtRef.current
+
+      const res = await fetch('/api/sessions/ping', { method: 'PATCH', headers })
       if (!res.ok) return
       const data = await res.json()
       if (data.sessionReplaced) {
         clearAuth()
         router.push('/login?reason=session_replaced')
+        return
       }
+      if (data.lastSeenAt) lastSeenAtRef.current = data.lastSeenAt
     } catch {
       // Network blip — ignore, will retry
     }
