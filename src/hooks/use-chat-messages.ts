@@ -254,10 +254,11 @@ export function useChatMessages(
     const now = new Date().toISOString()
 
     // Determine message type from MIME
-    let messageType: 'image' | 'video' | 'file'
-    if (file.type.startsWith('image/')) messageType = 'image'
+    let messageType: 'image' | 'video' | 'voice_note' | 'file'
+    if (file.type.startsWith('image/'))      messageType = 'image'
     else if (file.type.startsWith('video/')) messageType = 'video'
-    else messageType = 'file'
+    else if (file.type.startsWith('audio/')) messageType = 'voice_note'
+    else                                     messageType = 'file'
 
     const optimistic: Message = {
       id: tempId,

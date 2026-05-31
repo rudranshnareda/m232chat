@@ -8,10 +8,15 @@ interface RouteContext {
 
 const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 
-function getMimeCategory(mimeType: string): 'image' | 'video' | 'voice_note' | 'file' {
+const AUDIO_EXTS = new Set(['webm', 'm4a', 'mp3', 'ogg', 'opus', 'wav', 'aac', 'flac'])
+
+function getMimeCategory(mimeType: string, filename: string): 'image' | 'video' | 'voice_note' | 'file' {
   if (mimeType.startsWith('image/'))  return 'image'
   if (mimeType.startsWith('video/'))  return 'video'
   if (mimeType.startsWith('audio/'))  return 'voice_note'
+  // Fallback: use file extension when MIME type is missing or generic
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  if (AUDIO_EXTS.has(ext)) return 'voice_note'
   return 'file'
 }
 
@@ -65,7 +70,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   // Upload to Supabase Storage
-  const mimeCategory = getMimeCategory(file.type)
+  const mimeCategory = getMimeCategory(file.type, file.name)
   const fileExt = file.name.split('.').pop() || 'bin'
   const timestamp = Date.now()
   const filename = `${conversationId}/${meId}/${timestamp}_${Math.random().toString(36).slice(2)}.${fileExt}`

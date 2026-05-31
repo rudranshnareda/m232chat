@@ -29,6 +29,11 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+const AUDIO_EXTS = /\.(webm|m4a|mp3|ogg|opus|wav|aac|flac)(\?|$)/i
+function isAudioUrl(url: string | null): boolean {
+  return !!url && AUDIO_EXTS.test(url)
+}
+
 // ── Delivery tick ────────────────────────────────────────────────────────────
 function DeliveryTick({ status }: { status: MessageDeliveryStatus | undefined }) {
   switch (status) {
@@ -215,6 +220,9 @@ export function MessageBubble({
           message.isOptimistic
             ? <p className="italic text-xs opacity-70">🎤 Sending voice note…</p>
             : <VoiceNotePlayer src={message.content ?? ''} isMe={isMe} />
+        ) : message.messageType === 'file' && isAudioUrl(message.content) ? (
+          // Fallback: file classified incorrectly but URL is audio — render player
+          <VoiceNotePlayer src={message.content ?? ''} isMe={isMe} />
         ) : message.messageType === 'file' ? (
           <a
             href={message.content ?? '#'}
