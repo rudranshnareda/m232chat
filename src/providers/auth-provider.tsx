@@ -74,6 +74,12 @@ export function AuthProvider({ children, initialUser, initialToken }: AuthProvid
         if (!isPublicRoute) startIntervals()
       }
       setInitialized()
+      // Fire-and-forget ephemeral cleanup on every page load / refresh.
+      // This is what makes history=off feel ephemeral — messages vanish
+      // when you reload, not just when you log out.
+      if (!isPublicRoute) {
+        fetch('/api/cleanup', { method: 'POST' }).catch(() => {})
+      }
     }
 
     init()
