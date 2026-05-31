@@ -59,7 +59,42 @@ function useConvMeta(conversationId: string) {
     } finally { setIsToggling(false) }
   }, [meta, isToggling, conversationId])
 
-  return { meta, metaError, isToggling, toggleError, toggleSaveHistory }
+  return { meta, metaError, isToggling, toggleError, toggleSaveHistory, refetchMeta: () => {
+    fetch(`/api/conversations/${conversationId}`)
+      .then(r => r.json())
+      .then(data => { if (!data.error) setMeta(data.conversation) })
+      .catch(() => {})
+  }}
+}
+
+// ── Last-seen formatting ──────────────────────────────────────────────────────
+
+function formatLastSeen(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1)   return 'last seen just now'
+  if (mins < 60)  return `last seen ${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs  < 24)  return `last seen ${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return 'last seen yesterday'
+  if (days  < 7)  return `last seen ${days} days ago`
+  return `last seen ${new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' })}`
+}
+
+/** Ticking "last seen" label — re-computes every 60 s. */
+function useLastSeenLabel(iso: string | null | undefined, isOnline: boolean): string {
+  const [label, setLabel] = useState(() => isOnline ? '' : formatLastSeen(iso))
+
+  useEffect(() => {
+    if (isOnline) { setLabel(''); return }
+    setLabel(formatLastSeen(iso))
+    const id = setInterval(() => setLabel(formatLastSeen(iso)), 60_000)
+    return () => clearInterval(id)
+  }, [iso, isOnline])
+
+  return label
 }
 
 // ── Chat page ────────────────────────────────────────────────────────────────
@@ -77,7 +112,7 @@ export default function ChatPage({ params }: ChatPageProps) {
     return () => { qc.invalidateQueries({ queryKey: ['conversations'] }) }
   }, [qc])
 
-  const { meta, metaError, isToggling, toggleError, toggleSaveHistory } = useConvMeta(conversationId)
+  const { meta, metaError, isToggling, toggleError, toggleSaveHistory, refetchMeta } = useConvMeta(conversationId)
   const saveHistory = meta?.saveHistory
 
   const {
@@ -165,10 +200,19 @@ export default function ChatPage({ params }: ChatPageProps) {
     return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
   }
 
-  const otherUser    = meta?.otherUser
-  const myUsername   = me?.username ? `@${me.username}` : 'You'
-  const otherName    = otherUser?.username ? `@${otherUser.username}` : 'Them'
-  const otherOnline  = useIsOnline(otherUser?.id)
+  const otherUser   = meta?.otherUser
+  const myUsername  = me?.username ? `@${me.username}` : 'You'
+  const otherName   = otherUser?.username ? `@${otherUser.username}` : 'Them'
+  const otherOnline = useIsOnline(otherUser?.id)
+
+  // Re-fetch meta when the other user goes offline so lastSeenAt is fresh
+  const prevOnlineRef = useRef(otherOnline)
+  useEffect(() => {
+    if (prevOnlineRef.current && !otherOnline) refetchMeta()
+    prevOnlineRef.current = otherOnline
+  }, [otherOnline]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const lastSeenLabel = useLastSeenLabel(otherUser?.lastSeenAt, otherOnline)
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -196,9 +240,12 @@ export default function ChatPage({ params }: ChatPageProps) {
             />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-foreground">@{otherUser.username}</p>
-              {otherOnline && (
-                <p className="text-[10px] text-green-500 leading-none">Online</p>
-              )}
+              {otherOnline
+                ? <p className="text-[10px] text-green-500 leading-none">Online</p>
+                : lastSeenLabel
+                  ? <p className="text-[10px] text-muted-foreground leading-none">{lastSeenLabel}</p>
+                  : null
+              }
             </div>
           </Link>
         ) : <div className="flex-1" />}

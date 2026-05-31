@@ -23,10 +23,19 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ sessionReplaced: true }, { status: 200 })
   }
 
-  await admin
-    .from('user_sessions')
-    .update({ last_ping_at: new Date().toISOString() })
-    .eq('id', sessionId)
+  const now = new Date().toISOString()
+
+  await Promise.all([
+    admin
+      .from('user_sessions')
+      .update({ last_ping_at: now })
+      .eq('id', sessionId),
+    // Keep users.last_seen_at current so "last seen" is accurate
+    admin
+      .from('users')
+      .update({ last_seen_at: now })
+      .eq('id', userId),
+  ])
 
   return Response.json({ ok: true, sessionReplaced: false })
 }
