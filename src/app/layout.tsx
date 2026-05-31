@@ -21,8 +21,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // Prevent iOS bounce and address bar showing on scroll
   viewportFit: 'cover',
+  // Resize the layout viewport when the virtual keyboard opens so the
+  // flex layout (header + messages + input) fits in the visible area.
+  // Supported Chrome 108+ / Android. On iOS it's a no-op but doesn't break.
+  interactiveWidget: 'resizes-content',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

@@ -199,7 +199,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
       if (!trimmed || disabled) return
       onSend(trimmed)
       setValue('')
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+        textareaRef.current.focus()   // keep keyboard open and cursor in box
+      }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
