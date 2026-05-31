@@ -327,6 +327,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {onSendMedia && (
               <button
                 onClick={() => fileInputRef.current?.click()}
+                onPointerDown={e => e.preventDefault()}
                 disabled={disabled || isSendingMedia}
                 aria-label="Attach media"
                 className={cn(
@@ -343,6 +344,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {showMic && (
               <button
                 onClick={startRecording}
+                onPointerDown={e => e.preventDefault()}
                 disabled={disabled || isSendingMedia}
                 aria-label="Record voice note"
                 className={cn(
@@ -359,6 +361,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             {!showMic && (
               <button
                 onClick={handleSend}
+                onPointerDown={e => e.preventDefault()}
                 disabled={!canSend || !!isSendingMedia}
                 aria-label="Send message"
                 className={cn(
