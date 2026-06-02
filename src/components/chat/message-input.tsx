@@ -8,7 +8,7 @@ import type { Message } from '@/types'
 
 interface MessageInputProps {
   onSend:          (content: string) => void
-  onSendMedia?:    (file: File) => Promise<void>
+  onSendMedia?:    (file: File, replyToMessageId?: string | null, duration?: number) => Promise<void>
   disabled?:       boolean
   isSendingMedia?: boolean
   replyTo?:        Message | null
