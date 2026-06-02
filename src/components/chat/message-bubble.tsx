@@ -258,7 +258,7 @@ export function MessageBubble({
             controls
             className="max-h-64 max-w-full rounded-lg"
           />
-        ) : message.messageType === 'audio' ? (
+        ) : (message.messageType === 'audio' || (message.messageType as string) === 'voice_note') ? (
           message.isOptimistic
             ? <p className="italic text-xs opacity-70">🎤 Sending voice note…</p>
             : <VoiceNotePlayer src={message.content ?? ''} isMe={isMe} />
