@@ -19,7 +19,7 @@ interface MessageInputProps {
 }
 
 const TYPE_LABEL: Partial<Record<string, string>> = {
-  image: '📷 Photo', video: '🎬 Video', voice_note: '🎤 Voice note',
+  image: '📷 Photo', video: '🎬 Video', audio: '🎤 Voice note',
   file: '📎 File', link: '🔗 Link',
 }
 
@@ -229,9 +229,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
       if (!blob || !onSendMedia) return
       const ext  = mimeType.includes('mp4') ? 'm4a' : 'webm'
       const file = new File([blob], `voice_${Date.now()}.${ext}`, { type: mimeType })
-      try { await onSendMedia(file) }
-      finally { discard() }
-    }, [blob, mimeType, onSendMedia, discard])
+      // Pass duration in milliseconds as metadata
+      await onSendMedia(file, null, duration * 1000)
+      discard()
+    }, [blob, mimeType, onSendMedia, discard, duration])
 
     const canSend    = value.trim().length > 0 && !disabled
     const showMic    = !canSend && !!onSendMedia && recordingState === 'idle'

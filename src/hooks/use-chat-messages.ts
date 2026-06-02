@@ -45,7 +45,7 @@ export interface UseChatMessagesResult {
   hasMore:        boolean
   loadOlder:      () => Promise<void>
   sendMessage:    (content: string, replyToMessageId?: string | null) => Promise<void>
-  sendMedia:      (file: File, replyToMessageId?: string | null) => Promise<void>
+  sendMedia:      (file: File, replyToMessageId?: string | null, duration?: number) => Promise<void>
   retryFailed:    (tempId: string, content: string) => Promise<void>
   deleteMessage:   (messageId: string, target: 'me' | 'both') => Promise<void>
   toggleReaction:  (messageId: string, emoji: string) => Promise<void>
@@ -304,6 +304,7 @@ export function useChatMessages(
   const sendMedia = useCallback(async (
     file: File,
     replyToMessageId?: string | null,
+    duration?: number, // duration in milliseconds
   ) => {
     if (!me) return
 
@@ -311,10 +312,10 @@ export function useChatMessages(
     const now = new Date().toISOString()
 
     // Determine message type from MIME
-    let messageType: 'image' | 'video' | 'voice_note' | 'file'
+    let messageType: 'image' | 'video' | 'audio' | 'file'
     if (file.type.startsWith('image/'))      messageType = 'image'
     else if (file.type.startsWith('video/')) messageType = 'video'
-    else if (file.type.startsWith('audio/')) messageType = 'voice_note'
+    else if (file.type.startsWith('audio/')) messageType = 'audio'
     else                                     messageType = 'file'
 
     const optimistic: Message = {
@@ -342,7 +343,9 @@ export function useChatMessages(
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('messageType', messageType)
       if (replyToMessageId) formData.append('replyToMessageId', replyToMessageId)
+      if (duration !== undefined) formData.append('duration', duration.toString())
 
       const res = await fetch(
         `/api/conversations/${conversationId}/messages/upload`,

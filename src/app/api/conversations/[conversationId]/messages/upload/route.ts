@@ -10,13 +10,13 @@ const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 
 const AUDIO_EXTS = new Set(['webm', 'm4a', 'mp3', 'ogg', 'opus', 'wav', 'aac', 'flac'])
 
-function getMimeCategory(mimeType: string, filename: string): 'image' | 'video' | 'voice_note' | 'file' {
+function getMimeCategory(mimeType: string, filename: string): 'image' | 'video' | 'audio' | 'file' {
   if (mimeType.startsWith('image/'))  return 'image'
   if (mimeType.startsWith('video/'))  return 'video'
-  if (mimeType.startsWith('audio/'))  return 'voice_note'
+  if (mimeType.startsWith('audio/'))  return 'audio'
   // Fallback: use file extension when MIME type is missing or generic
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
-  if (AUDIO_EXTS.has(ext)) return 'voice_note'
+  if (AUDIO_EXTS.has(ext)) return 'audio'
   return 'file'
 }
 
@@ -45,6 +45,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   // Parse FormData
   const formData = await request.formData()
   const file = formData.get('file') as File | null
+  const clientMessageType = (formData.get('messageType') as string | null) ?? null
+  const audioDuration = (formData.get('duration') as string | null) ?? null  // duration in milliseconds
   const replyToMessageId = (formData.get('replyToMessageId') as string | null) ?? null
 
   if (!file) return Response.json({ error: 'No file provided.' }, { status: 400 })
@@ -70,7 +72,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   // Upload to Supabase Storage
-  const mimeCategory = getMimeCategory(file.type, file.name)
+  // Prioritize client-provided messageType (client has better knowledge of the actual file type)
+  // Fall back to server-side detection if not provided
+  let mimeCategory: 'image' | 'video' | 'audio' | 'file'
+  if (clientMessageType && ['image', 'video', 'audio', 'file'].includes(clientMessageType)) {
+    mimeCategory = clientMessageType as 'image' | 'video' | 'audio' | 'file'
+  } else {
+    mimeCategory = getMimeCategory(file.type, file.name)
+  }
   const fileExt = file.name.split('.').pop() || 'bin'
   const timestamp = Date.now()
   const filename = `${conversationId}/${meId}/${timestamp}_${Math.random().toString(36).slice(2)}.${fileExt}`
@@ -131,6 +140,20 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   const msg = msgData[0]
+
+  // For audio messages, store metadata in message_media
+  if (mimeCategory === 'audio' && audioDuration) {
+    const durationMs = parseInt(audioDuration, 10)
+    if (!isNaN(durationMs)) {
+      await admin.from('message_media').insert({
+        message_id: msg.id,
+        storage_path: filename,
+        mime_type: file.type || 'audio/webm',
+        file_size_bytes: file.size,
+        duration_ms: durationMs,
+      })
+    }
+  }
 
   // Insert delivery status
   await admin.from('message_status').insert({

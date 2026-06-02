@@ -1,7 +1,7 @@
 // Database row types — mirror of the SQL schema exactly.
 
 export type RequestStatus = 'pending' | 'accepted' | 'declined'
-export type MessageType   = 'text' | 'image' | 'video' | 'file' | 'voice_note' | 'link'
+export type MessageType   = 'text' | 'image' | 'video' | 'audio' | 'file' | 'link'
 
 export interface DbUser {
   id:             string
