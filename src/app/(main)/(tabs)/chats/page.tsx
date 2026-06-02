@@ -34,11 +34,11 @@ interface ConversationItem {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const MSG_TYPE_PREVIEW: Partial<Record<MessageType, string>> = {
-  image:      '📷 Photo',
-  video:      '🎬 Video',
-  voice_note: '🎤 Voice note',
-  file:       '📎 File',
-  link:       '🔗 Link',
+  image:  '📷 Photo',
+  video:  '🎬 Video',
+  audio:  '🎤 Voice note',
+  file:   '📎 File',
+  link:   '🔗 Link',
 }
 
 function lastMessagePreview(msg: LastMessage | null, meId: string): string {

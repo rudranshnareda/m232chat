@@ -20,7 +20,7 @@ interface MessageActionSheetProps {
 // ── Message preview (truncated) shown at top of sheet ──────────────────────
 function MessagePreview({ message }: { message: Message }) {
   const TYPE_LABEL: Partial<Record<string, string>> = {
-    image: 'Photo', video: 'Video', voice_note: 'Voice note', file: 'File',
+    image: 'Photo', video: 'Video', audio: 'Voice note', file: 'File',
   }
   const text = message.messageType === 'text'
     ? (message.content ?? '')
