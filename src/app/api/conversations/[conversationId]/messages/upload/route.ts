@@ -10,13 +10,13 @@ const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
 
 const AUDIO_EXTS = new Set(['webm', 'm4a', 'mp3', 'ogg', 'opus', 'wav', 'aac', 'flac'])
 
-function getMimeCategory(mimeType: string, filename: string): 'image' | 'video' | 'audio' | 'file' {
+function getMimeCategory(mimeType: string, filename: string): 'image' | 'video' | 'voice_note' | 'file' {
   if (mimeType.startsWith('image/'))  return 'image'
   if (mimeType.startsWith('video/'))  return 'video'
-  if (mimeType.startsWith('audio/'))  return 'audio'
+  if (mimeType.startsWith('audio/'))  return 'voice_note'
   // Fallback: use file extension when MIME type is missing or generic
   const ext = filename.split('.').pop()?.toLowerCase() ?? ''
-  if (AUDIO_EXTS.has(ext)) return 'audio'
+  if (AUDIO_EXTS.has(ext)) return 'voice_note'
   return 'file'
 }
 
@@ -74,9 +74,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   // Upload to Supabase Storage
   // Prioritize client-provided messageType (client has better knowledge of the actual file type)
   // Fall back to server-side detection if not provided
-  let mimeCategory: 'image' | 'video' | 'audio' | 'file'
-  if (clientMessageType && ['image', 'video', 'audio', 'file'].includes(clientMessageType)) {
-    mimeCategory = clientMessageType as 'image' | 'video' | 'audio' | 'file'
+  let mimeCategory: 'image' | 'video' | 'voice_note' | 'file'
+  if (clientMessageType && ['image', 'video', 'voice_note', 'file'].includes(clientMessageType)) {
+    mimeCategory = clientMessageType as 'image' | 'video' | 'voice_note' | 'file'
   } else {
     mimeCategory = getMimeCategory(file.type, file.name)
   }
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const msg = msgData[0]
 
   // For audio messages, store metadata in message_media
-  if (mimeCategory === 'audio' && audioDuration) {
+  if (mimeCategory === 'voice_note' && audioDuration) {
     const durationMs = parseInt(audioDuration, 10)
     if (!isNaN(durationMs)) {
       await admin.from('message_media').insert({

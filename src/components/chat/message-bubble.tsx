@@ -18,7 +18,7 @@ interface MessageBubbleProps {
 }
 
 const TYPE_LABEL: Partial<Record<string, string>> = {
-  image: '📷 Photo', video: '🎬 Video', audio: '🎤 Voice note',
+  image: '📷 Photo', video: '🎬 Video', voice_note: '🎤 Voice note',
   file: '📎 File', link: '🔗 Link',
 }
 
@@ -258,7 +258,7 @@ export function MessageBubble({
             controls
             className="max-h-64 max-w-full rounded-lg"
           />
-        ) : (message.messageType === 'audio' || (message.messageType as string) === 'voice_note') ? (
+        ) : message.messageType === 'voice_note' ? (
           message.isOptimistic
             ? <p className="italic text-xs opacity-70">🎤 Sending voice note…</p>
             : <VoiceNotePlayer src={message.content ?? ''} isMe={isMe} />

@@ -44,7 +44,7 @@ export interface Conversation {
   unreadCount?: number
 }
 
-export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'file' | 'link'
+export type MessageType = 'text' | 'image' | 'video' | 'voice_note' | 'file' | 'link'
 
 export type MessageDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed'
 

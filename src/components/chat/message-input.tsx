@@ -19,7 +19,7 @@ interface MessageInputProps {
 }
 
 const TYPE_LABEL: Partial<Record<string, string>> = {
-  image: '📷 Photo', video: '🎬 Video', audio: '🎤 Voice note',
+  image: '📷 Photo', video: '🎬 Video', voice_note: '🎤 Voice note',
   file: '📎 File', link: '🔗 Link',
 }
 

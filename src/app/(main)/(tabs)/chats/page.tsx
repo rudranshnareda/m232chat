@@ -36,7 +36,7 @@ interface ConversationItem {
 const MSG_TYPE_PREVIEW: Partial<Record<MessageType, string>> = {
   image:  '📷 Photo',
   video:  '🎬 Video',
-  audio:  '🎤 Voice note',
+  voice_note: '🎤 Voice note',
   file:   '📎 File',
   link:   '🔗 Link',
 }

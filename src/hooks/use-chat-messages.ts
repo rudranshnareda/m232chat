@@ -312,10 +312,10 @@ export function useChatMessages(
     const now = new Date().toISOString()
 
     // Determine message type from MIME
-    let messageType: 'image' | 'video' | 'audio' | 'file'
+    let messageType: 'image' | 'video' | 'voice_note' | 'file'
     if (file.type.startsWith('image/'))      messageType = 'image'
     else if (file.type.startsWith('video/')) messageType = 'video'
-    else if (file.type.startsWith('audio/')) messageType = 'audio'
+    else if (file.type.startsWith('audio/')) messageType = 'voice_note'
     else                                     messageType = 'file'
 
     const optimistic: Message = {
